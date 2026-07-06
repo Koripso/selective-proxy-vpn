@@ -5,12 +5,13 @@
  * Manifest V3). It is responsible for:
  *
  *   1. Building a PAC (Proxy Auto-Config) script based on the list of
- *      sites the user has added.
+ *      sites the user has added, and the proxy server address/port the
+ *      user has configured.
  *   2. Applying that PAC script to Chrome via chrome.proxy.settings.set.
- *   3. Reacting to messages from popup.js whenever the site list changes,
- *      so the proxy rules update instantly without needing to restart
- *      the browser.
- *   4. Initializing an empty site list the first time the extension is
+ *   3. Reacting to messages from popup.js whenever the site list or the
+ *      proxy server settings change, so the rules update instantly
+ *      without needing to restart the browser.
+ *   4. Initializing default values the first time the extension is
  *      installed.
  *
  * How the PAC script works:
@@ -25,12 +26,13 @@
  * ----------------------------------------------------------------------
  */
 
-// Key used to read/write the site list in chrome.storage.local
-const STORAGE_KEY = "proxySites";
+// Storage keys — must match the ones used in popup.js
+const SITES_KEY = "proxySites";
+const PROXY_CONFIG_KEY = "proxyConfig";
 
-// Placeholder SOCKS5 proxy address — replace with your real proxy server
-const PROXY_ADDRESS = "123.45.67.89";
-const PROXY_PORT = 1080;
+// Fallback values used only if the user hasn't configured a proxy yet
+const DEFAULT_PROXY_ADDRESS = "127.0.0.1";
+const DEFAULT_PROXY_PORT = 1080;
 
 /**
  * Builds a PAC (Proxy Auto-Config) script as a plain string.
@@ -40,12 +42,16 @@ const PROXY_PORT = 1080;
  *   - Returns "DIRECT" for every other request.
  *
  * @param {string[]} sites - Array of domains the user wants proxied.
+ * @param {{address: string, port: number}} proxyConfig - Proxy server
+ *        address and port to route matched traffic through.
  * @returns {string} - The full PAC script source code.
  */
-function buildPacScript(sites) {
+function buildPacScript(sites, proxyConfig) {
   // Serialize the site list so it can be embedded directly inside the
   // PAC script as a JavaScript array literal.
   const sitesJson = JSON.stringify(sites);
+  const proxyAddress = proxyConfig.address;
+  const proxyPort = proxyConfig.port;
 
   const pacScript = `
     function FindProxyForURL(url, host) {
@@ -56,11 +62,13 @@ function buildPacScript(sites) {
       for (var i = 0; i < proxySites.length; i++) {
         var site = proxySites[i].toLowerCase();
 
-        // Match either the exact domain, or any subdomain of it.
+        // Match either the exact domain/IP, or any subdomain of it.
         // Example: a rule for "example.com" also matches
         // "mail.example.com" and "shop.example.com".
+        // IP addresses and "localhost" are matched by exact string only,
+        // since they don't have subdomains.
         if (host === site || host.endsWith("." + site)) {
-          return "SOCKS5 ${PROXY_ADDRESS}:${PROXY_PORT}";
+          return "SOCKS5 ${proxyAddress}:${proxyPort}";
         }
       }
 
@@ -72,76 +80,114 @@ function buildPacScript(sites) {
 }
 
 /**
- * Applies the given list of sites as the active proxy configuration.
- * Builds a fresh PAC script and pushes it to Chrome's proxy settings.
+ * Applies the given list of sites and proxy configuration as the active
+ * proxy configuration. Builds a fresh PAC script and pushes it to
+ * Chrome's proxy settings.
  *
  * @param {string[]} sites - Array of domains the user wants proxied.
+ * @param {{address: string, port: number}} proxyConfig - Proxy server
+ *        address and port.
+ * @returns {Promise<void>} - Resolves once settings have been applied,
+ *        rejects if Chrome reports an error.
  */
-function applyProxySettings(sites) {
-  const pacScript = buildPacScript(sites);
+function applyProxySettings(sites, proxyConfig) {
+  return new Promise((resolve, reject) => {
+    const pacScript = buildPacScript(sites, proxyConfig);
 
-  const config = {
-    mode: "pac_script",
-    pacScript: {
-      data: pacScript
-    }
-  };
-
-  chrome.proxy.settings.set(
-    { value: config, scope: "regular" },
-    () => {
-      if (chrome.runtime.lastError) {
-        console.error("Failed to apply proxy settings:", chrome.runtime.lastError);
-      } else {
-        console.log(`Proxy settings updated. Active sites: ${sites.length}`);
+    const config = {
+      mode: "pac_script",
+      pacScript: {
+        data: pacScript
       }
-    }
-  );
+    };
+
+    chrome.proxy.settings.set(
+      { value: config, scope: "regular" },
+      () => {
+        if (chrome.runtime.lastError) {
+          console.error("Failed to apply proxy settings:", chrome.runtime.lastError);
+          reject(chrome.runtime.lastError);
+        } else {
+          console.log(`Proxy settings updated. Active sites: ${sites.length}, proxy: ${proxyConfig.address}:${proxyConfig.port}`);
+          resolve();
+        }
+      }
+    );
+  });
 }
 
 /**
- * Reads the current site list from chrome.storage.local and re-applies
- * the proxy configuration based on it. Used whenever the list changes,
- * or whenever the browser/service worker restarts.
+ * Reads the current site list and proxy configuration from
+ * chrome.storage.local and re-applies the proxy settings based on them.
+ * Used whenever either value changes, or whenever the browser/service
+ * worker restarts.
+ *
+ * @returns {Promise<void>}
  */
 function refreshProxyFromStorage() {
-  chrome.storage.local.get([STORAGE_KEY], (result) => {
-    const sites = result[STORAGE_KEY] || [];
-    applyProxySettings(sites);
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get([SITES_KEY, PROXY_CONFIG_KEY], (result) => {
+      const sites = result[SITES_KEY] || [];
+      const proxyConfig = result[PROXY_CONFIG_KEY] || {
+        address: DEFAULT_PROXY_ADDRESS,
+        port: DEFAULT_PROXY_PORT
+      };
+
+      applyProxySettings(sites, proxyConfig)
+        .then(resolve)
+        .catch(reject);
+    });
   });
 }
 
 /**
  * Runs once when the extension is first installed (or updated).
- * Makes sure there is always a site list in storage, even if it's empty,
- * and applies the initial proxy configuration.
+ * Makes sure there is always a site list and a proxy configuration in
+ * storage, even if they're just default/empty values, and applies the
+ * initial proxy configuration.
  */
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.get([STORAGE_KEY], (result) => {
-    if (!result[STORAGE_KEY]) {
-      // First install: create an empty list
-      chrome.storage.local.set({ [STORAGE_KEY]: [] }, () => {
-        console.log("Initialized empty proxy site list.");
-        applyProxySettings([]);
+  chrome.storage.local.get([SITES_KEY, PROXY_CONFIG_KEY], (result) => {
+    const updates = {};
+
+    if (!result[SITES_KEY]) {
+      updates[SITES_KEY] = [];
+    }
+
+    if (!result[PROXY_CONFIG_KEY]) {
+      updates[PROXY_CONFIG_KEY] = {
+        address: DEFAULT_PROXY_ADDRESS,
+        port: DEFAULT_PROXY_PORT
+      };
+    }
+
+    if (Object.keys(updates).length > 0) {
+      chrome.storage.local.set(updates, () => {
+        console.log("Initialized default proxy site list / proxy configuration.");
+        refreshProxyFromStorage();
       });
     } else {
-      // Extension was updated: re-apply the existing list
-      applyProxySettings(result[STORAGE_KEY]);
+      // Extension was updated: re-apply the existing configuration
+      refreshProxyFromStorage();
     }
   });
 });
 
 /**
  * Listens for messages from popup.js. When the popup notifies us that
- * the site list has changed, we immediately rebuild and re-apply the
- * PAC script so the new rules take effect without delay.
+ * the site list or the proxy configuration has changed, we immediately
+ * rebuild and re-apply the PAC script so the new rules take effect
+ * without delay. Responds with a status object so the popup can show
+ * success/error feedback to the user.
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "UPDATE_PROXY_SETTINGS") {
-    refreshProxyFromStorage();
-    sendResponse({ status: "ok" });
+    refreshProxyFromStorage()
+      .then(() => sendResponse({ status: "ok" }))
+      .catch((error) => sendResponse({ status: "error", error: String(error) }));
+
+    return true; // Keep the message channel open for the async response
   }
-  return true; // Keep the message channel open for async response
 });
 
 /**

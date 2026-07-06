@@ -4,18 +4,10 @@
 <meta charset="UTF-8">
 <title>Selective Proxy VPN</title>
 <style>
-  /* ------------------------------------------------------------------
-     Global reset: makes width/height calculations predictable across
-     all elements.
-  ------------------------------------------------------------------ */
   * {
     box-sizing: border-box;
   }
 
-  /* ------------------------------------------------------------------
-     Popup container. Chrome extension popups need a fixed width;
-     height adjusts automatically to content.
-  ------------------------------------------------------------------ */
   body {
     width: 300px;
     margin: 0;
@@ -25,7 +17,6 @@
     color: #e6e6e6;
   }
 
-  /* Title with a small green "active" dot before it */
   h1 {
     font-size: 15px;
     font-weight: 600;
@@ -45,15 +36,35 @@
     display: inline-block;
   }
 
-  /* Row containing the domain input field and the "Add" button */
-  .input-row {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 12px;
+  /* Section labels (used above the proxy server fields and the site list) */
+  .section-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6b6c76;
+    margin: 14px 0 6px 0;
   }
 
-  #domain-input {
+  .section-label:first-of-type {
+    margin-top: 0;
+  }
+
+  /* Row containing the proxy server address + port inputs */
+  .proxy-config-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  #proxy-address-input {
+    flex: 2;
+  }
+
+  #proxy-port-input {
     flex: 1;
+  }
+
+  .text-input {
     padding: 8px 10px;
     border-radius: 8px;
     border: 1px solid #3a3b45;
@@ -62,10 +73,40 @@
     font-size: 13px;
     outline: none;
     transition: border-color 0.15s ease;
+    width: 100%;
   }
 
-  #domain-input:focus {
+  .text-input:focus {
     border-color: #4caf7d;
+  }
+
+  .secondary-btn {
+    padding: 8px 14px;
+    border: 1px solid #3a3b45;
+    border-radius: 8px;
+    background: transparent;
+    color: #e6e6e6;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .secondary-btn:hover {
+    border-color: #4caf7d;
+    background: rgba(76, 175, 125, 0.08);
+  }
+
+  /* Row containing the domain input field and the "Add" button */
+  .input-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  #domain-input {
+    flex: 1;
   }
 
   #add-btn {
@@ -84,12 +125,25 @@
     background: #5cc98f;
   }
 
-  /* Validation error message shown under the input row */
+  /* Validation / status messages */
   #error-msg {
     font-size: 11px;
     color: #ff6b6b;
-    margin: -6px 0 8px 0;
+    margin: -2px 0 8px 0;
     min-height: 14px;
+  }
+
+  #status-msg {
+    font-size: 11px;
+    color: #4caf7d;
+    margin: -2px 0 8px 0;
+    min-height: 14px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  #status-msg.visible {
+    opacity: 1;
   }
 
   /* Scrollable list of proxied sites */
@@ -97,7 +151,7 @@
     list-style: none;
     margin: 0;
     padding: 0;
-    max-height: 220px;
+    max-height: 180px;
     overflow-y: auto;
   }
 
@@ -153,20 +207,40 @@
     font-size: 12px;
     padding: 16px 0;
   }
+
+  hr {
+    border: none;
+    border-top: 1px solid #3a3b45;
+    margin: 14px 0;
+  }
 </style>
 </head>
 <body>
 
   <h1>Selective Proxy</h1>
 
-  <!-- Input field + button for adding a new domain to the proxy list -->
+  <!-- Proxy server configuration -->
+  <div class="section-label">Proxy server (SOCKS5)</div>
+  <div class="proxy-config-row">
+    <input type="text" id="proxy-address-input" class="text-input" placeholder="127.0.0.1" />
+    <input type="text" id="proxy-port-input" class="text-input" placeholder="1080" />
+  </div>
+  <button id="save-proxy-btn" class="secondary-btn">Save proxy settings</button>
+
+  <hr />
+
+  <!-- Site list management -->
+  <div class="section-label">Sites routed through proxy</div>
   <div class="input-row">
-    <input type="text" id="domain-input" placeholder="example.com" />
+    <input type="text" id="domain-input" class="text-input" placeholder="example.com" />
     <button id="add-btn">Add</button>
   </div>
 
   <!-- Validation error messages appear here -->
   <div id="error-msg"></div>
+
+  <!-- Success / status messages appear here -->
+  <div id="status-msg"></div>
 
   <!-- Dynamically populated list of sites currently being proxied -->
   <ul id="site-list"></ul>

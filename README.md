@@ -38,14 +38,7 @@ This means only the sites you explicitly choose have their traffic proxied; ever
 
 ## Configuring your proxy server
 
-Open `background.js` and replace the placeholder SOCKS5 address with your own proxy server's address and port:
-
-```javascript
-const PROXY_ADDRESS = "123.45.67.89";
-const PROXY_PORT = 1080;
-```
-
-After editing, reload the extension from `chrome://extensions/` for the change to take effect.
+Open the extension popup and enter your SOCKS5 proxy server's address and port directly in the **"Proxy server (SOCKS5)"** section, then click **Save proxy settings**. No code editing required — the extension stores this configuration in `chrome.storage.local` and applies it immediately.
 
 ### Setting up a SOCKS5 proxy for testing
 
@@ -55,19 +48,15 @@ If you don't already have a SOCKS5 server, the quickest way to test this extensi
 ssh -D 1080 -N -f user@your-server-ip
 ```
 
-This opens a local SOCKS5 proxy at `127.0.0.1:1080` that tunnels traffic through your remote server. In that case, set:
-
-```javascript
-const PROXY_ADDRESS = "127.0.0.1";
-const PROXY_PORT = 1080;
-```
+This opens a local SOCKS5 proxy at `127.0.0.1:1080` that tunnels traffic through your remote server. These are also the default values pre-filled in the popup.
 
 ## Usage
 
 1. Click the extension icon to open the popup.
-2. Type a domain (e.g. `example.com`) and click **Add**.
-3. Traffic to that domain — and any of its subdomains — will now be routed through your configured proxy.
-4. Click the **✕** button next to any listed domain to remove it and instantly restore direct connections for that site.
+2. Under **"Proxy server (SOCKS5)"**, enter your proxy's address and port, then click **Save proxy settings**.
+3. Under **"Sites routed through proxy"**, type a domain, IP address, or `localhost`, then click **Add**.
+4. Traffic to that host — and any of its subdomains, if it's a domain — will now be routed through your configured proxy.
+5. Click the **✕** button next to any listed entry to remove it and instantly restore direct connections for that host.
 
 
 ## Project structure
@@ -83,8 +72,9 @@ const PROXY_PORT = 1080;
 
 ## Known limitations
 
-- The proxy address is currently hardcoded as a placeholder in `background.js` and must be manually replaced.
 - Proxy servers that require authentication (username/password) are not yet supported out of the box — this would require additionally handling the `chrome.webRequest.onAuthRequired` event.
+- IDN (internationalized/Unicode) domain names are not currently supported by the validation logic.
+- `host_permissions: ["<all_urls>"]` and the `proxy` permission are broad by design (the extension needs to inspect every request to decide whether to proxy it). If you plan to publish this extension on the Chrome Web Store, be prepared to justify these permissions and provide a privacy policy.
 
 ## License
 
