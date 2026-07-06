@@ -69,14 +69,17 @@ const PROXY_PORT = 1080;
 3. Traffic to that domain — and any of its subdomains — will now be routed through your configured proxy.
 4. Click the **✕** button next to any listed domain to remove it and instantly restore direct connections for that site.
 
+
 ## Project structure
 
-selective-proxy-vpn/
-├── manifest.json    — Extension configuration and permissions
-├── background.js    — Builds and applies the PAC script; manages proxy state
-├── popup.html       — Popup UI markup and styling
-├── popup.js         — Popup UI logic (add/remove sites, storage sync)
-└── README.md        — Project documentation
+| File | Description |
+|---|---|
+| `manifest.json` | Extension configuration and permissions |
+| `background.js` | Builds and applies the PAC script; manages proxy state |
+| `popup.html` | Popup UI markup and styling |
+| `popup.js` | Popup UI logic (add/remove sites, storage sync) |
+| `README.md` | Project documentation |
+
 
 ## Known limitations
 
