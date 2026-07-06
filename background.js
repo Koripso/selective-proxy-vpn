@@ -41,15 +41,23 @@ const DEFAULT_PROXY_PORT = 1080;
  *     one of the domains in `sites`, or is a subdomain of one of them.
  *   - Returns "DIRECT" for every other request.
  *
+ * FIXED: Now properly escapes special characters in site names to prevent
+ * PAC script injection attacks.
+ *
  * @param {string[]} sites - Array of domains the user wants proxied.
  * @param {{address: string, port: number}} proxyConfig - Proxy server
  *        address and port to route matched traffic through.
  * @returns {string} - The full PAC script source code.
  */
 function buildPacScript(sites, proxyConfig) {
-  // Serialize the site list so it can be embedded directly inside the
-  // PAC script as a JavaScript array literal.
-  const sitesJson = JSON.stringify(sites);
+  // Sanitize sites to prevent injection: escape backslashes and quotes
+  const sanitizedSites = sites.map(site => {
+    return site
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"');
+  });
+  
+  const sitesJson = JSON.stringify(sanitizedSites);
   const proxyAddress = proxyConfig.address;
   const proxyPort = proxyConfig.port;
 

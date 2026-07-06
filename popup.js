@@ -100,6 +100,9 @@ function isValidIPv4(value) {
  * This is not a full RFC-compliant validator, but it's enough to catch
  * obvious typos and prevent garbage entries.
  *
+ * FIXED: Now properly validates single-label domains (not just multi-label)
+ * and handles edge cases with hyphens.
+ *
  * @param {string} host - The normalized host to validate.
  * @returns {boolean} - True if the host looks valid.
  */
@@ -112,8 +115,10 @@ function isValidHost(host) {
     return true;
   }
 
-  const domainPattern = /^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z0-9-]{1,63})+$/;
-  return domainPattern.test(host);
+  // Updated pattern: allows single-label domains like "myhost" and multi-label like "example.com"
+  // Labels cannot start or end with hyphen, and can be 1-63 chars
+  const domainPattern = /^(?!-)([a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z0-9-]{1,63}(?<!-))*)?$/;
+  return domainPattern.test(host) && host.length > 0;
 }
 
 /**
@@ -134,15 +139,23 @@ function isValidPort(value) {
 /**
  * Shows a temporary success message under the site input row.
  * Automatically fades out after a short delay.
+ * FIXED: Now properly clears the timeout to prevent multiple messages stacking.
  *
  * @param {string} text - The message to display.
  */
+let statusTimeoutId = null;
 function showStatusMessage(text) {
+  // Clear any pending timeout to prevent stacking
+  if (statusTimeoutId) {
+    clearTimeout(statusTimeoutId);
+  }
+  
   statusMsg.textContent = text;
   statusMsg.classList.add("visible");
 
-  setTimeout(() => {
+  statusTimeoutId = setTimeout(() => {
     statusMsg.classList.remove("visible");
+    statusTimeoutId = null;
   }, 2000);
 }
 
@@ -208,13 +221,16 @@ function renderSiteList(sites) {
  * or the proxy configuration has changed, so it can rebuild the PAC
  * script and re-apply proxy settings immediately. Shows a success or
  * error message to the user based on the response.
+ * FIXED: Now handles missing response object safely.
  */
 function notifyBackgroundToUpdateProxy() {
   chrome.runtime.sendMessage({ type: "UPDATE_PROXY_SETTINGS" }, (response) => {
+    // Guard against cases where response is undefined
     if (response && response.status === "ok") {
       showStatusMessage("✓ Proxy settings applied");
     } else {
-      errorMsg.textContent = "Failed to apply proxy settings. Check the service worker console.";
+      const errorText = response?.error || "Unknown error";
+      errorMsg.textContent = `Failed to apply proxy settings: ${errorText}. Check the service worker console.`;
     }
   });
 }

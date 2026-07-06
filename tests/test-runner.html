@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selective Proxy VPN - Test Suite</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4caf7d;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        pre {
+            background: #1e1f26;
+            color: #e6e6e6;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        .pass {
+            color: #4caf7d;
+            font-weight: bold;
+        }
+        .fail {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+        .summary {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .summary-item {
+            flex: 1;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .summary-item.passed {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .summary-item.failed {
+            background: #ffebee;
+            color: #c62828;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px 5px 10px 0;
+            background: #4caf7d;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        button:hover {
+            background: #45a06e;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Selective Proxy VPN - Test Suite</h1>
+    
+    <div class="test-section">
+        <h2>How to run tests:</h2>
+        <ol>
+            <li>Open this file in a browser (Chrome recommended)</li>
+            <li>Open DevTools console (F12 or right-click → Inspect → Console)</li>
+            <li>Click "Run All Tests" button below</li>
+            <li>Results will appear both in the console and on this page</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Controls</h2>
+        <button onclick="runAllTests()">▶ Run All Tests</button>
+        <button onclick="runPopupTests()">▶ Run Popup Tests</button>
+        <button onclick="runBackgroundTests()">▶ Run Background Tests</button>
+        <button onclick="clearResults()">🗑 Clear Results</button>
+    </div>
+
+    <div class="test-section" id="results-container" style="display: none;">
+        <h2>Test Results</h2>
+        <div id="results"></div>
+        <div id="summary" class="summary"></div>
+    </div>
+
+    <!-- Load test files -->
+    <script src="../popup.js"></script>
+    <script src="popup.test.js"></script>
+    <script src="../background.js"></script>
+    <script src="background.test.js"></script>
+
+    <script>
+        function runPopupTests() {
+            console.clear();
+            console.log("Starting popup tests...");
+            const result = runTests();
+            displayResults('Popup Tests', result);
+        }
+
+        function runBackgroundTestsWrapper() {
+            console.log("Starting background tests...");
+            const result = runBackgroundTests();
+            displayResults('Background Tests', result);
+        }
+
+        function runAllTests() {
+            console.clear();
+            console.log("Starting all tests...\n");
+            
+            let totalPassed = 0;
+            let totalFailed = 0;
+            
+            const popupResult = runTests();
+            totalPassed += popupResult.passed;
+            totalFailed += popupResult.failed;
+            
+            const bgResult = runBackgroundTests();
+            totalPassed += bgResult.passed;
+            totalFailed += bgResult.failed;
+            
+            displaySummary(totalPassed, totalFailed);
+        }
+
+        function displayResults(name, result) {
+            const container = document.getElementById('results-container');
+            const resultsDiv = document.getElementById('results');
+            const summaryDiv = document.getElementById('summary');
+            
+            container.style.display = 'block';
+            
+            const resultHtml = `
+                <h3>${name}</h3>
+                <p><span class="pass">✓ Passed: ${result.passed}</span> / <span class="fail">✗ Failed: ${result.failed}</span></p>
+            `;
+            
+            resultsDiv.innerHTML += resultHtml;
+            summaryDiv.innerHTML = `
+                <div class="summary-item passed">
+                    ✓ Passed<br>
+                    <span style="font-size: 24px;">${result.passed}</span>
+                </div>
+                <div class="summary-item failed">
+                    ✗ Failed<br>
+                    <span style="font-size: 24px;">${result.failed}</span>
+                </div>
+            `;
+        }
+
+        function displaySummary(totalPassed, totalFailed) {
+            const container = document.getElementById('results-container');
+            const summaryDiv = document.getElementById('summary');
+            
+            container.style.display = 'block';
+            summaryDiv.innerHTML = `
+                <div class="summary-item passed">
+                    ✓ Total Passed<br>
+                    <span style="font-size: 24px;">${totalPassed}</span>
+                </div>
+                <div class="summary-item failed">
+                    ✗ Total Failed<br>
+                    <span style="font-size: 24px;">${totalFailed}</span>
+                </div>
+            `;
+            
+            if (totalFailed === 0) {
+                summaryDiv.innerHTML += '<div style="grid-column: 1/-1; text-align: center; color: #2e7d32; font-size: 18px; margin-top: 20px;">🎉 All tests passed!</div>';
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('results-container').style.display = 'none';
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('summary').innerHTML = '';
+            console.clear();
+        }
+    </script>
+</body>
+</html>
