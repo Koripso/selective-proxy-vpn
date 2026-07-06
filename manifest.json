@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Selective Proxy VPN",
+  "version": "1.0.0",
+  "description": "Routes traffic through a SOCKS5 proxy only for user-defined sites, while all other traffic goes DIRECT.",
+
+  "permissions": ["proxy", "storage", "tabs"],
+  "host_permissions": ["<all_urls>"],
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Selective Proxy VPN"
+  }
+}
