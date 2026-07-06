@@ -2,6 +2,9 @@
 
 A Chrome extension (Manifest V3) that routes web traffic through a SOCKS5 proxy **only** for domains explicitly added by the user. All other traffic bypasses the proxy entirely and connects directly (DIRECT).
 
+<img width="582" height="596" alt="image" src="https://github.com/user-attachments/assets/90cfa79d-4d83-4cd9-8dfd-83c9586d4896" />
+
+
 ## Features
 
 - Add and remove domains through a simple popup interface
